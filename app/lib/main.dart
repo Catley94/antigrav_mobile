@@ -259,25 +259,85 @@ class _MyHomePageState extends State<MyHomePage> {
                   : ListView.builder(
                       itemCount: _messages.length,
                       itemBuilder: (context, index) {
-                        final item = _messages[index];
-                        return ListTile(
-                          leading: const Icon(Icons.notifications),
-                          title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(item.message),
-                              Text(
-                                item.time.toString().substring(0, 16),
-                                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                              ),
-                            ],
-                          ),
-                        );
+                        return NotificationTile(item: _messages[index]);
                       },
                     ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class NotificationTile extends StatefulWidget {
+  final NotificationItem item;
+  const NotificationTile({super.key, required this.item});
+
+  @override
+  State<NotificationTile> createState() => _NotificationTileState();
+}
+
+class _NotificationTileState extends State<NotificationTile> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      // Use InkWell for the ripple effect on tap
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _expanded = !_expanded;
+          });
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Row: Icon + Title + Time
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.notifications, color: Colors.deepPurple),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.item.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        Text(
+                          widget.item.time.toString().substring(0, 16),
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    color: Colors.grey,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Body Text
+              // If collapsed, we chop the string to ~100 chars or use maxLines
+              // User asked for "max character limit", but maxLines is safer for layout.
+              // We'll interpret it as a short preview.
+              Text(
+                widget.item.message,
+                style: const TextStyle(fontSize: 14),
+                maxLines: _expanded ? null : 2, // 2 lines collapsed, unlimited extended
+                overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
