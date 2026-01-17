@@ -149,6 +149,7 @@ import time
 def handle_reply(data):
     """
     Handles a reply received from the phone.
+    Now includes Antigravity-specific auto-typing using xdotool.
     """
     try:
         title = data.get('title', 'Reply')
@@ -157,7 +158,7 @@ def handle_reply(data):
         # Log to console
         print(f"\n[Incoming Reply] {title}: {message}")
         
-        # Write to file
+        # Write to file (backup)
         log_path = "incoming_replies.log"
         with open(log_path, "a") as f:
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -165,10 +166,38 @@ def handle_reply(data):
             
         print(f"Reply saved to {log_path}")
         
-        # Send a desktop notification so the user sees it immediately
-        # We use subprocess to call notify-send (ironic, but efficient)
+        # ==========================================
+        # Antigravity Auto-Reply Feature
+        # ==========================================
         import subprocess
-        subprocess.run(["notify-send", f"Reply from Phone", message])
+        
+        # Try to find Antigravity window
+        result = subprocess.run(
+            ["xdotool", "search", "--name", "Antigravity"],
+            capture_output=True, text=True
+        )
+        
+        window_ids = result.stdout.strip().split('\n')
+        
+        if window_ids and window_ids[0]:
+            window_id = window_ids[0]  # Use the first matching window
+            print(f"[Auto-Reply] Found Antigravity window: {window_id}")
+            
+            # Focus the window (bring to front)
+            subprocess.run(["xdotool", "windowactivate", "--sync", window_id])
+            time.sleep(0.2)  # Brief delay for window activation
+            
+            # Type the message
+            print(f"[Auto-Reply] Typing: {message[:30]}...")
+            subprocess.run(["xdotool", "type", "--clearmodifiers", "--delay", "15", message])
+            
+            # Press Enter to send
+            subprocess.run(["xdotool", "key", "Return"])
+            print(f"[Auto-Reply] ✅ Sent!")
+        else:
+            print(f"[Auto-Reply] ❌ Antigravity window not found. stdout: '{result.stdout}' stderr: '{result.stderr}'")
+            # Fallback: Show desktop notification
+            subprocess.run(["notify-send", "Reply from Phone (Manual)", message])
         
     except Exception as e:
         print(f"[Error] Handling reply: {e}")
@@ -176,13 +205,14 @@ def handle_reply(data):
 def poll_replies():
     """
     Background thread that listens to the Ntfy stream for updates.
-    Uses STREAMING mode (not poll) to receive realtime messages.
+    Uses STREAMING mode to receive realtime messages.
     """
     print("Starting Reply Listener (Background)...")
     
-    # Streaming URL - no poll=1, uses long-polling/SSE
-    # since=all gets old messages first, then new ones as they arrive
-    url = f"http://127.0.0.1:8080/{NTFY_TOPIC}/json?since=all"
+    # Streaming URL - use 'since=10s' for recent messages only (avoids replay)
+    # We also track processed message IDs to prevent duplicates
+    url = f"http://127.0.0.1:8080/{NTFY_TOPIC}/json?since=10s"
+    processed_ids = set()  # Track which message IDs we've already handled
     
     while True:
         try:
@@ -195,6 +225,11 @@ def poll_replies():
                         try:
                             data = json.loads(line)
                             event = data.get('event')
+                            msg_id = data.get('id')
+                            
+                            # Skip already processed messages
+                            if msg_id in processed_ids:
+                                continue
                             
                             if event == 'message':
                                 # Check tags to see if it's a reply
@@ -203,8 +238,8 @@ def poll_replies():
                                 
                                 if 'reply' in tags or title == 'Reply from Mobile':
                                     handle_reply(data)
-                                # else: # Uncomment to debug
-                                #     print(f"[Reply Listener] Ignored: {title} (tags: {tags})")
+                                    if msg_id:
+                                        processed_ids.add(msg_id)
                         except json.JSONDecodeError:
                             pass
         except Exception as e:
