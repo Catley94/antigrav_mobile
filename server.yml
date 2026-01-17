@@ -1,0 +1,21 @@
+# Ntfy Server Configuration (Local)
+# Run with: ntfy serve --config server.yml
+
+# Listen on port 8080 (accessible from LAN)
+listen-http: ":8080"
+
+# Cache attachments (optional, useful for images)
+attachment-cache-dir: "./cache"
+
+# Base URL (important for iOS/Android app to know where to pull from)
+# Replace 192.168.1.159 with your actual machine IP if it changes
+base-url: "http://192.168.1.159:8080"
+
+# Disable authentication for simplicity (safe for local LAN)
+auth-default-access: "read-write"
+
+# Rate Limits (Unlimited for local use)
+global-request-limit: 10000
+visitor-request-limit-burst: 10000
+visitor-request-limit-replenish: "1s"
+visitor-message-daily-limit: 100000

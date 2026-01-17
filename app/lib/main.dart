@@ -38,6 +38,10 @@ class _MyHomePageState extends State<MyHomePage> {
   List<NotificationItem> _messages = [];
   bool _loading = true;
   
+  // Configuration
+  // We default to the local IP we found: 192.168.1.159
+  String _baseUrl = 'http://192.168.1.159:8080/antigrav_sam_notifications';
+  
   // Polling variables
   Timer? _timer;
   int? _selectedInterval = 60; // Default to 60 seconds. null means "Manual"
@@ -101,8 +105,9 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     try {
+      // Use the dynamic _baseUrl
       final response = await http.get(
-        Uri.parse('https://ntfy.sh/antigrav_sam_notifications/json?poll=1&since=12h'),
+        Uri.parse('$_baseUrl/json?poll=1&since=12h'),
       );
 
       if (response.statusCode == 200) {
@@ -150,7 +155,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     try {
       final response = await http.post(
-        Uri.parse('https://ntfy.sh/antigrav_sam_notifications'),
+        Uri.parse(_baseUrl),
         body: 'This is a test from your Mobile App!',
         headers: {
           'Title': 'Mobile Test',
@@ -185,6 +190,49 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  void _showSettingsDialog() {
+      final TextEditingController _ipController = TextEditingController(text: _baseUrl);
+      showDialog(
+          context: context,
+          builder: (context) {
+              return AlertDialog(
+                  title: const Text("Server Settings"),
+                  content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                          const Text("Enter full topic URL:"),
+                          const SizedBox(height: 8),
+                          TextField(
+                              controller: _ipController,
+                              decoration: const InputDecoration(
+                                  labelText: "Server URL",
+                                  border: OutlineInputBorder(),
+                                  hintText: "http://192.168.1.159:8080/topic",
+                              ),
+                          ),
+                      ],
+                  ),
+                  actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("Cancel"),
+                      ),
+                      FilledButton(
+                          onPressed: () {
+                              setState(() {
+                                  _baseUrl = _ipController.text;
+                              });
+                              Navigator.pop(context);
+                              _fetchMessages(); // Refresh with new URL
+                          },
+                          child: const Text("Save"),
+                      ),
+                  ],
+              );
+          }
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -192,6 +240,11 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
+            onPressed: _showSettingsDialog,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh Now',
@@ -259,7 +312,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   : ListView.builder(
                       itemCount: _messages.length,
                       itemBuilder: (context, index) {
-                        return NotificationTile(item: _messages[index]);
+                        return NotificationTile(
+                            item: _messages[index], 
+                            baseUrl: _baseUrl
+                        );
                       },
                     ),
           ),
@@ -271,7 +327,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
 class NotificationTile extends StatefulWidget {
   final NotificationItem item;
-  const NotificationTile({super.key, required this.item});
+  final String baseUrl;
+  
+  const NotificationTile({
+      super.key, 
+      required this.item, 
+      required this.baseUrl
+  });
 
   @override
   State<NotificationTile> createState() => _NotificationTileState();
@@ -279,6 +341,58 @@ class NotificationTile extends StatefulWidget {
 
 class _NotificationTileState extends State<NotificationTile> {
   bool _expanded = false;
+
+  Future<void> _sendReply(String message) async {
+      try {
+        await http.post(
+          Uri.parse(widget.baseUrl),
+          body: message,
+          headers: {
+            'Title': 'Reply from Mobile',
+            'Tags': 'reply', 
+          },
+        );
+        if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Reply Sent! 📨')),
+            );
+        }
+      } catch (e) {
+         print("Reply failed: $e");
+      }
+  }
+
+  void _showReplyDialog(BuildContext context) {
+      final TextEditingController _controller = TextEditingController();
+      showDialog(
+          context: context,
+          builder: (context) {
+              return AlertDialog(
+                  title: const Text("Reply to Desktop"),
+                  content: TextField(
+                      controller: _controller,
+                      autofocus: true,
+                      decoration: const InputDecoration(hintText: "Type a message..."),
+                  ),
+                  actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("Cancel"),
+                      ),
+                      FilledButton(
+                          onPressed: () {
+                              if (_controller.text.isNotEmpty) {
+                                  _sendReply(_controller.text);
+                                  Navigator.pop(context);
+                              }
+                          },
+                          child: const Text("Send"),
+                      ),
+                  ],
+              );
+          }
+      );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -326,15 +440,27 @@ class _NotificationTileState extends State<NotificationTile> {
               ),
               const SizedBox(height: 8),
               // Body Text
-              // If collapsed, we chop the string to ~100 chars or use maxLines
-              // User asked for "max character limit", but maxLines is safer for layout.
-              // We'll interpret it as a short preview.
               Text(
                 widget.item.message,
                 style: const TextStyle(fontSize: 14),
-                maxLines: _expanded ? null : 2, // 2 lines collapsed, unlimited extended
+                maxLines: _expanded ? null : 2,
                 overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
               ),
+              
+              // Action Bar (Only visible when expanded)
+              if (_expanded) ...[
+                  const Divider(),
+                  Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                          TextButton.icon(
+                              onPressed: () => _showReplyDialog(context),
+                              icon: const Icon(Icons.reply),
+                              label: const Text("Reply to Desktop"),
+                          ),
+                      ],
+                  )
+              ]
             ],
           ),
         ),
