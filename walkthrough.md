@@ -1,0 +1,67 @@
+# Antigravity Mobile Notification System - Walkthrough
+
+## Overview
+We have built a flexible "Global Notification Bridge" that connects your Linux Laptop to your Phone.
+
+**How it works:**
+1.  **Laptop Bridge (`bridge.py`)**: Listens to the Linux system notification bus (DBus).
+2.  **Ntfy.sh**: Acts as the relay server (no account needed).
+3.  **Your Phone**: Receives notifications via the Ntfy app (recommended) or our custom Flutter Companion App.
+
+## 📂 Project Structure
+- `bridge/` -> Contains the Python script to run on your laptop.
+- `app/` -> Contains the Flutter source code for the mobile companion app.
+
+## 🚀 Getting Started
+
+### 1. Start the Laptop Bridge
+The bridge needs to be running to capture notifications.
+
+```bash
+cd /home/sam/Documents/antigrav_mobile/bridge
+./run_bridge.sh
+```
+*Tip: You can add this script to your "Startup Applications" to have it run automatically on boot.*
+
+### 2. Setup Your Phone
+**Option A: The Easy Way (Native Ntfy App)**
+1.  Install **Ntfy** from the Play Store (Android) or App Store (iOS).
+2.  Subscribe to the topic: `antigrav_sam_notifications`
+3.  Done! You will now receive alerts.
+
+**Option B: The Custom App (For learning)**
+1.  We have built a custom flutter app in `app/`.
+2.  Run the app on your phone (via USB debugging) or Emulator:
+    ```bash
+    cd /home/sam/Documents/antigrav_mobile/app
+    flutter run
+    ```
+3.  The app shows a dashboard and notification history.
+
+## ✅ Verification & Debugging
+1.  Ensure the bridge is running.
+2.  Open a terminal on your laptop.
+3.  **Run a test notification using `notify-send`**:
+    This standard Linux command sends a desktop notification that our bridge listens for.
+    ```bash
+    # Syntax: notify-send "Title" "Body"
+    notify-send "Antigravity" "This is a test from your laptop!"
+    ```
+4.  **Result**: Your phone should buzz immediately!
+
+### Troubleshooting
+If you don't receive it:
+- Check the terminal where `./run_bridge.sh` is running. You should see logs like:
+  ```
+  [Received] App: notify-send, Title: Antigravity
+  [Sent] Antigravity: This is a test...
+  ```
+- If you see `[Skipped] Duplicate`, it means the same message was sent too quickly. Try changing the text.
+
+## 📚 Educational Notes
+I have heavily commented the code in `bridge/bridge.py` and `app/lib/main.dart` to explain:
+- **DBus Monitoring**: How we "spy" on system messages.
+- **HTTP Requests**: How we talk to the Ntfy web API.
+- **Flutter State**: How the app manages the list of messages.
+
+Enjoy your connected experience!
