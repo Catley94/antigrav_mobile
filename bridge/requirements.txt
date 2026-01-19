@@ -1,0 +1,5 @@
+requests
+# Note: dbus-python and PyGObject are best installed via system packages
+# but we list them here for completeness if a user tries to install in a pure venv
+# dbus-python
+# PyGObject

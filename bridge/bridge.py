@@ -77,6 +77,12 @@ def message_filter(connection, message):
         if "Antigravity" in app_name:
             print(f"[DEBUG DUMP] Antigravity Raw Args: {args}")
 
+        # Requested Debug: Print all args
+        print(f"\n--- Notification Args Dump ---")
+        for i, arg in enumerate(args):
+            print(f"Arg [{i}]: {arg}")
+        print("------------------------------\n")
+
         global last_sent_notification
         current_signature = f"{app_name}:{summary}:{body}"
         
@@ -90,7 +96,11 @@ def message_filter(connection, message):
         if app_name == "notify-send" and "bridge_test" in summary:
             pass # Allow test
         
-        send_to_ntfy(summary, body)
+        # Use App Name as the Title (e.g. "Antigravity")
+        # instead of the summary (e.g. "Review requested")
+        clean_title = app_name
+
+        send_to_ntfy(clean_title, body)
         last_sent_notification = current_signature
         
         return HANDLER_RESULT_HANDLED
@@ -149,7 +159,7 @@ import time
 def handle_reply(data):
     """
     Handles a reply received from the phone.
-    Now includes Antigravity-specific auto-typing using xdotool.
+    Now uses the native 'antigravity chat' CLI command.
     """
     try:
         title = data.get('title', 'Reply')
@@ -167,37 +177,25 @@ def handle_reply(data):
         print(f"Reply saved to {log_path}")
         
         # ==========================================
-        # Antigravity Auto-Reply Feature
+        # Antigravity CLI Auto-Reply
         # ==========================================
         import subprocess
         
-        # Try to find Antigravity window
+        print(f"[Auto-Reply] Sending via CLI: {message[:50]}...")
+        
+        # Use antigravity chat command
+        # Syntax: antigravity chat "message"
         result = subprocess.run(
-            ["xdotool", "search", "--name", "Antigravity"],
+            ["antigravity", "chat", message],
             capture_output=True, text=True
         )
         
-        window_ids = result.stdout.strip().split('\n')
-        
-        if window_ids and window_ids[0]:
-            window_id = window_ids[0]  # Use the first matching window
-            print(f"[Auto-Reply] Found Antigravity window: {window_id}")
-            
-            # Focus the window (bring to front)
-            subprocess.run(["xdotool", "windowactivate", "--sync", window_id])
-            time.sleep(0.2)  # Brief delay for window activation
-            
-            # Type the message
-            print(f"[Auto-Reply] Typing: {message[:30]}...")
-            subprocess.run(["xdotool", "type", "--clearmodifiers", "--delay", "15", message])
-            
-            # Press Enter to send
-            subprocess.run(["xdotool", "key", "Return"])
-            print(f"[Auto-Reply] ✅ Sent!")
+        if result.returncode == 0:
+            print(f"[Auto-Reply] ✅ Sent successfully via CLI.")
         else:
-            print(f"[Auto-Reply] ❌ Antigravity window not found. stdout: '{result.stdout}' stderr: '{result.stderr}'")
+            print(f"[Auto-Reply] ❌ CLI Error: {result.stderr}")
             # Fallback: Show desktop notification
-            subprocess.run(["notify-send", "Reply from Phone (Manual)", message])
+            subprocess.run(["notify-send", "Reply Error", f"Failed to send: {result.stderr}"])
         
     except Exception as e:
         print(f"[Error] Handling reply: {e}")

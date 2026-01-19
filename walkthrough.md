@@ -21,7 +21,7 @@ The bridge needs to be running to capture notifications.
 cd /home/sam/Documents/antigrav_mobile/bridge
 ./run_bridge.sh
 ```
-*Tip: You can add this script to your "Startup Applications" to have it run automatically on boot.*
+*Note: The script now automatically manages a python virtual environment (`.venv`) for you.*
 
 ### 2. Setup Your Phone
 **Option A: The Easy Way (Native Ntfy App)**
@@ -69,7 +69,7 @@ If you don't receive it:
 ## 📚 Educational Notes
 I have heavily commented the code in `bridge/bridge.py` and `app/lib/main.dart` to explain:
 - **DBus Monitoring**: How we "spy" on system messages.
-- **HTTP Requests**: How we talk to the Ntfy web API.
+- **Antigravity CLI**: How we use the native `antigravity chat` command to send your replies back to the AI.
 - **Flutter State**: How the app manages the list of messages.
 
 Enjoy your connected experience!
